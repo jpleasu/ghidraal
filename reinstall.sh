@@ -6,7 +6,7 @@ rm -f dist/*.zip
 gradle
 
 # clean
-rm -f $GHIDRA_INSTALL_DIR/Extensions/Ghidra/*Ghidraaal*
+rm -f $GHIDRA_INSTALL_DIR/Extensions/Ghidra/*Ghidraal*
 rm -rf $GHIDRA_INSTALL_DIR/Ghidra/Extensions/Ghidraal
 
 # copy
