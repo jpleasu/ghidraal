@@ -1,17 +1,22 @@
 package ghidraal;
 
 import java.io.*;
-import java.lang.reflect.InvocationTargetException;
 
 import generic.jar.ResourceFile;
 import ghidra.app.script.GhidraScript;
 import ghidra.app.script.GhidraScriptProvider;
 
-public class Python3ScriptProvider extends GhidraScriptProvider {
+// class name mustn't end with provider, or ClassSearcher will find it
+public class GhidraalScriptProviderBase extends GhidraScriptProvider {
+	final GhidraalPlugin.LangInfo li;
+
+	public GhidraalScriptProviderBase(GhidraalPlugin.LangInfo li) {
+		this.li = li;
+	}
 
 	@Override
 	public String getDescription() {
-		return "graalpython";
+		return "graal" + li.langid;
 	}
 
 	@Override
@@ -26,29 +31,20 @@ public class Python3ScriptProvider extends GhidraScriptProvider {
 
 	@Override
 	public String getCommentCharacter() {
-		return "#";
+		return li.comment;
 	}
 
 	@Override
 	public String getExtension() {
-		return ".py";
+		return li.ext;
 	}
 
 	@Override
 	public GhidraScript getScriptInstance(ResourceFile sourceFile, PrintWriter writer)
 			throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-
-		Class<?> clazz = Class.forName(GraalPythonScript.class.getName());
-		GhidraScript script;
-		try {
-			script = (GhidraScript) clazz.getDeclaredConstructor().newInstance();
-		}
-		catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-				| InvocationTargetException | NoSuchMethodException | SecurityException e) {
-			throw new InstantiationException(e.getMessage());
-		}
-		script.setSourceFile(sourceFile);
-		return script;
+		GhidraalScript scr = li.newScript();
+		scr.setSourceFile(sourceFile);
+		return scr;
 	}
 
 }

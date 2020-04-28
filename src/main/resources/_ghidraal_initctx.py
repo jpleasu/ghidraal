@@ -1,8 +1,5 @@
 import java
 
-java.sys.stdout=_gsout
-java.sys.stderr=_gserr
-
 class Cls:
   def _import(self, name, *args, **kwargs):
     try:
@@ -18,4 +15,3 @@ if not hasattr(builtins, '_iwhack'):
   original_import = builtins.__import__
   builtins.__import__ = Cls()._import
   builtins._iwhack=True
-

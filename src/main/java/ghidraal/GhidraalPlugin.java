@@ -1,22 +1,11 @@
-/* ###
- * IP: GHIDRA
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- * 
- *      http://www.apache.org/licenses/LICENSE-2.0
- * 
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package ghidraal;
 
 import java.io.PrintWriter;
-import java.util.Iterator;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.Language;
 
 import ghidra.app.plugin.PluginCategoryNames;
 import ghidra.app.plugin.ProgramPlugin;
@@ -36,26 +25,85 @@ import ghidra.framework.plugintool.util.PluginStatus;
 	packageName = "Ghidraal",
 	category = PluginCategoryNames.INTERPRETERS,
 	shortDescription = "GraalVM scripting for Ghidra",
-	description = "Ghidraal is an extension that exposes GraalVM scripting languages to the Ghidra API"
+	description = "Ghidraal integrates GraalVM scripting languages into Ghidra's scripting manager"
 )
 //@formatter:on
 public class GhidraalPlugin extends ProgramPlugin {
+
+	static class LangInfo {
+		final String ext;
+		final String langid;
+		final String comment;
+		final Map<String, String> options;
+
+		LangInfo(String ext, String langid, String comment, String... options) {
+			this.ext = ext;
+			this.langid = langid;
+			this.comment = comment;
+			this.options = new HashMap<String, String>();
+			for (int i = 0; i < options.length - 1; i += 2) {
+				this.options.put(options[i], options[i + 1]);
+			}
+		}
+
+		GhidraalScript newScript() {
+			return new GhidraalScript(this);
+		}
+	}
+
+	// @formatter:off
+	static List<GhidraalPlugin.LangInfo> linfos = Arrays.asList(
+		new GhidraalPlugin.LangInfo(".py", "python", "#"),
+		
+		new GhidraalPlugin.LangInfo(".js", "js", "//",
+			"js.commonjs-require", "true",
+			"js.commonjs-require-cwd", System.getProperty("java.home")+"/languages/js/npm"
+		),
+		
+		new GhidraalPlugin.LangInfo(".r", "R", "#"),
+		
+		new GhidraalPlugin.LangInfo(".rb", "ruby", "#") {
+			@Override
+			GhidraalScript newScript() {
+				return new GhidraalScript(this) {
+					@Override
+					void putGlobal(String identifier, Object value) {
+						pgb.putMember(identifier, value);
+						ctx.eval("ruby", "$"+identifier+"=Polyglot.import('"+identifier+"')\n");
+					}
+				};
+			}
+		}
+	);
+	// @formatter:on
+	public static Map<String, GhidraalPlugin.LangInfo> ext2li =
+		linfos.stream().collect(Collectors.toUnmodifiableMap(li -> li.ext, li -> li));
 
 	public GhidraalPlugin(PluginTool tool) {
 		super(tool, true, true);
 	}
 
+	static boolean done = false;
+	static GhidraScriptProvider removed_python_provider = null;
+
 	@Override
 	public void init() {
 		super.init();
+		System.err.printf("Ghidraal plugin init\n");
 		ConsoleService consoleService = tool.getService(ConsoleService.class);
-		// remove other Providers registered for .py handling
-		Iterator<GhidraScriptProvider> it = GhidraScriptUtil.getProviders().iterator();
-		while (it.hasNext()) {
-			GhidraScriptProvider p = it.next();
-			if (p.getExtension().equals(".py")) {
-				if (!(p instanceof Python3ScriptProvider)) {
+		if (!done) {
+			done = true;
+			Map<String, Language> allLangs = Engine.newBuilder().build().getLanguages();
+
+			// remove Provider registered for .py handling
+			Iterator<GhidraScriptProvider> it = GhidraScriptUtil.getProviders().iterator();
+			while (it.hasNext()) {
+				GhidraScriptProvider p = it.next();
+				if (p.getExtension().equals(".py")) {
+					System.err.printf("removing old python provider\n");
+					removed_python_provider = p;
 					it.remove();
+
 					if (consoleService != null) {
 						PrintWriter stdout = consoleService.getStdOut();
 						if (stdout != null) {
@@ -64,7 +112,34 @@ public class GhidraalPlugin extends ProgramPlugin {
 					}
 				}
 			}
+			System.err.printf("adding our providers\n");
+
+			GhidraScriptUtil.getProviders().addAll(
+				ext2li.values().stream().filter(li -> allLangs.containsKey(li.langid)).map(
+					GhidraalScriptProviderBase::new).collect(Collectors.toUnmodifiableList()));
+
+			for (GhidraScriptProvider p : GhidraScriptUtil.getProviders()) {
+				System.err.printf("  %s %s\n", p.getExtension(), p.getDescription());
+			}
 		}
-		// GhidraScriptUtil.getProviders().add(new Python3ScriptProvider());
+	}
+
+	@Override
+	protected void dispose() {
+		if (done) {
+			List<GhidraScriptProvider> providers = GhidraScriptUtil.getProviders();
+			if (removed_python_provider != null) {
+				providers.add(removed_python_provider);
+				removed_python_provider = null;
+			}
+			Iterator<GhidraScriptProvider> it = GhidraScriptUtil.getProviders().iterator();
+			while (it.hasNext()) {
+				GhidraScriptProvider p = it.next();
+				if (p instanceof GhidraalScriptProviderBase) {
+					it.remove();
+				}
+			}
+			done = false;
+		}
 	}
 }
