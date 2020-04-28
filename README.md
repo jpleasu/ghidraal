@@ -29,7 +29,7 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
         gradle
         ls dist/
     ```
-    - or download here
+    - or download a [release](/../../releases)
 
 3. Run ghidra with GraalVM and install the extension
 ```bash
