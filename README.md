@@ -43,8 +43,8 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
     From the main window, select `File->Install Extensions...`, check `Ghidraal` and restart Ghidra.
 
 5. Open a program, select `File->Configure...` under `Experiment`, select
-   `Configure`, and check `GhidraalPlugin`.
-
+   `Configure`, and check `GhidraalPlugin`.  Restart Ghidra to register new
+   language providers.
 
 ## usage
 
