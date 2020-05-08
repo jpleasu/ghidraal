@@ -1,6 +1,6 @@
 package ghidraal;
 
-import java.io.PrintWriter;
+import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -60,7 +60,20 @@ public class GhidraalPlugin extends ProgramPlugin {
 			"js.commonjs-require-cwd", System.getProperty("java.home")+"/languages/js/npm"
 		),
 		
-		new GhidraalPlugin.LangInfo(".r", "R", "#"),
+		new GhidraalPlugin.LangInfo(".r", "R", "#") {
+			@Override
+			GhidraalScript newScript() {
+				return new GhidraalScript(this) {
+					@Override
+					protected void run(String n, InputStream s) throws IOException {
+						super.run(n, wrap("tryCatch((function(){",s,"})()," +
+							"warning=function(w) {gs$printf('warning: %s\\n', w);traceback()}, " +
+							"error=function(e) {gs$printf('error: %s\\n', e);traceback()}" +
+							");"));
+					}
+				};
+			}
+		},
 		
 		new GhidraalPlugin.LangInfo(".rb", "ruby", "#") {
 			@Override

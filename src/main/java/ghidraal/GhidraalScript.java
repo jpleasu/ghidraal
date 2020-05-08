@@ -1,6 +1,7 @@
 package ghidraal;
 
 import java.io.*;
+import java.util.Vector;
 
 import org.graalvm.polyglot.*;
 
@@ -63,7 +64,8 @@ public class GhidraalScript extends GhidraScript {
 		ConsoleService consoleservice = state.getTool().getService(ConsoleService.class);
 		ctx = (Context) state.getEnvironmentVar(storedContextName);
 
-		if (ctx == null) {
+		try {
+			if (ctx == null) {
 			// @formatter:off
 			ctx = Context.newBuilder(li.langid)
 					.allowAllAccess(true)
@@ -72,27 +74,43 @@ public class GhidraalScript extends GhidraScript {
 					.options(li.options)
 					.build();
 			// @formatter:on
-			state.addEnvironmentVar(storedContextName, ctx);
-			eval("_ghidraal_initctx");
+				state.addEnvironmentVar(storedContextName, ctx);
+				eval("_ghidraal_initctx");
+			}
+			pgb = ctx.getPolyglotBindings();
+			pb = ctx.getBindings(li.langid);
+
+			putGlobal("gs", this);
+			putGlobal("tool", state.getTool());
+			putGlobal("currentProgram", currentProgram);
+			putGlobal("currentAddress", currentAddress);
+			putGlobal("currentLocation", currentLocation);
+			putGlobal("currentHighlight", currentHighlight);
+			putGlobal("monitor", monitor);
+
+			eval("_ghidraal_initscript");
+
+			ResourceFile f = getSourceFile();
+			run(f.getName(), f.getInputStream());
 		}
-		pgb = ctx.getPolyglotBindings();
-		pb = ctx.getBindings(li.langid);
+		catch (PolyglotException e) {
+			e.printStackTrace(consoleservice.getStdErr());
+		}
+	}
 
-		putGlobal("gs", this);
-		putGlobal("tool", state.getTool());
-		putGlobal("currentProgram", currentProgram);
-		putGlobal("currentAddress", currentAddress);
-		putGlobal("currentLocation", currentLocation);
-		putGlobal("currentHighlight", currentHighlight);
-		putGlobal("monitor", monitor);
-
-		eval("_ghidraal_initscript");
-
-		ResourceFile f = getSourceFile();
-		try (InputStreamReader reader = new InputStreamReader(f.getInputStream())) {
-			Source source = Source.newBuilder(li.langid, reader, f.getName()).build();
+	protected void run(String scriptName, InputStream scriptContents) throws IOException {
+		try (InputStreamReader reader = new InputStreamReader(scriptContents)) {
+			Source source = Source.newBuilder(li.langid, reader, scriptName).build();
 			ctx.eval(source);
 		}
+	}
+
+	static protected InputStream wrap(String pre, InputStream stream, String post) {
+		Vector<InputStream> v = new Vector<>(2);
+		v.addElement(new ByteArrayInputStream(pre.getBytes()));
+		v.addElement(stream);
+		v.addElement(new ByteArrayInputStream(post.getBytes()));
+		return new SequenceInputStream(v.elements());
 	}
 
 	public static void main(String[] args) {
