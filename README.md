@@ -9,7 +9,7 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
 **Ghidraal will only work when Ghidra is run within a GraalVM!!!**
 
 
-1. download GraalVM (20.0+) and set up set `JAVA_HOME`, `PATH`, etc.  You can
+1. download GraalVM (20.1+) and set up set `JAVA_HOME`, `PATH`, etc.  You can
    copy and source [env.sh](/env.sh) for a hopefully painless install, e.g.
     ```
     mkdir ~/graalvm
