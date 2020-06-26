@@ -7,6 +7,9 @@ import java.util.stream.Collectors;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Language;
 
+import docking.ActionContext;
+import docking.action.DockingAction;
+import docking.action.MenuData;
 import ghidra.app.plugin.PluginCategoryNames;
 import ghidra.app.plugin.ProgramPlugin;
 import ghidra.app.script.GhidraScriptProvider;
@@ -15,6 +18,7 @@ import ghidra.app.services.ConsoleService;
 import ghidra.framework.plugintool.PluginInfo;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.framework.plugintool.util.PluginStatus;
+import ghidra.program.flatapi.FlatProgramAPI;
 
 /**
  * A simple shim to add script providers to GhidraScriptUtil before they're loaded by 
@@ -127,14 +131,42 @@ public class GhidraalPlugin extends ProgramPlugin {
 			}
 			System.err.printf("adding our providers\n");
 
-			GhidraScriptUtil.getProviders().addAll(
-				ext2li.values().stream().filter(li -> allLangs.containsKey(li.langid)).map(
-					GhidraalScriptProviderBase::new).collect(Collectors.toUnmodifiableList()));
+			GhidraScriptUtil.getProviders()
+					.addAll(ext2li.values()
+							.stream()
+							.filter(li -> allLangs.containsKey(li.langid))
+							.map(GhidraalScriptProviderBase::new)
+							.collect(Collectors.toUnmodifiableList()));
 
+			System.err.printf("all providers:\n");
 			for (GhidraScriptProvider p : GhidraScriptUtil.getProviders()) {
 				System.err.printf("  %s %s\n", p.getExtension(), p.getDescription());
 			}
 		}
+
+		addInterpreters();
+	}
+
+	void addInterpreters() {
+		DockingAction action = new DockingAction("Python3 console", this.getName()) {
+
+			@Override
+			public void actionPerformed(ActionContext context) {
+				new GhidraalConsole() {
+					protected void initializeGraalContext() {
+						super.initializeGraalContext();
+						ctx.getBindings(langId).putMember("currentProgram", currentProgram);
+						ctx.getBindings(langId).putMember("currentLocation", currentLocation);
+						ctx.getBindings(langId).putMember("currentSelection", currentSelection);
+						ctx.getBindings(langId)
+								.putMember("api", new FlatProgramAPI(currentProgram));
+					}
+				}.create(tool);
+			}
+		};
+		action.setMenuBarData(
+			new MenuData(new String[] { "&Window", "GraalVM Console - Python3" }));
+		tool.addAction(action);
 	}
 
 	@Override
