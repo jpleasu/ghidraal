@@ -4,8 +4,7 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import org.graalvm.polyglot.Engine;
-import org.graalvm.polyglot.Language;
+import org.graalvm.polyglot.*;
 
 import docking.ActionContext;
 import docking.action.DockingAction;
@@ -14,11 +13,11 @@ import ghidra.app.plugin.PluginCategoryNames;
 import ghidra.app.plugin.ProgramPlugin;
 import ghidra.app.script.GhidraScriptProvider;
 import ghidra.app.script.GhidraScriptUtil;
-import ghidra.app.services.ConsoleService;
 import ghidra.framework.plugintool.PluginInfo;
 import ghidra.framework.plugintool.PluginTool;
 import ghidra.framework.plugintool.util.PluginStatus;
 import ghidra.program.flatapi.FlatProgramAPI;
+import ghidraal.langs.*;
 
 /**
  * A simple shim to add script providers to GhidraScriptUtil before they're loaded by 
@@ -33,149 +32,117 @@ import ghidra.program.flatapi.FlatProgramAPI;
 )
 //@formatter:on
 public class GhidraalPlugin extends ProgramPlugin {
-
-	static class LangInfo {
-		final String ext;
-		final String langid;
-		final String comment;
-		final Map<String, String> options;
-
-		LangInfo(String ext, String langid, String comment, String... options) {
-			this.ext = ext;
-			this.langid = langid;
-			this.comment = comment;
-			this.options = new HashMap<String, String>();
-			for (int i = 0; i < options.length - 1; i += 2) {
-				this.options.put(options[i], options[i + 1]);
-			}
-		}
-
-		GhidraalScript newScript() {
-			return new GhidraalScript(this);
-		}
-	}
+	static boolean TRIED_TO_MODIFY_PROVIDERS = false;
+	static GhidraScriptProvider REMOVED_JYTHON_PROVIDER = null;
 
 	// @formatter:off
-	static List<GhidraalPlugin.LangInfo> linfos = Arrays.asList(
-		new GhidraalPlugin.LangInfo(".py", "python", "#"),
-		
-		new GhidraalPlugin.LangInfo(".js", "js", "//",
-			"js.commonjs-require", "true",
-			"js.commonjs-require-cwd", System.getProperty("java.home")+"/languages/js/npm"
-		),
-		
-		new GhidraalPlugin.LangInfo(".r", "R", "#") {
-			@Override
-			GhidraalScript newScript() {
-				return new GhidraalScript(this) {
-					@Override
-					protected void run(String n, InputStream s) throws IOException {
-						super.run(n, wrap("tryCatch((function(){",s,"})()," +
-							"warning=function(w) {gs$printf('warning: %s\\n', w);traceback()}, " +
-							"error=function(e) {gs$printf('error: %s\\n', e);traceback()}" +
-							");"));
-					}
-				};
-			}
-		},
-		
-		new GhidraalPlugin.LangInfo(".rb", "ruby", "#") {
-			@Override
-			GhidraalScript newScript() {
-				return new GhidraalScript(this) {
-					@Override
-					void putGlobal(String identifier, Object value) {
-						pgb.putMember(identifier, value);
-						ctx.eval("ruby", "$"+identifier+"=Polyglot.import('"+identifier+"')\n");
-					}
-				};
-			}
-		}
+	static List<LangInfo> langInfos = Arrays.asList(
+		new Python3LangInfo(),
+		new JavascriptLangInfo(),
+		new RscriptLangInfo(),
+		new RubyLangInfo()
 	);
 	// @formatter:on
-	public static Map<String, GhidraalPlugin.LangInfo> ext2li =
-		linfos.stream().collect(Collectors.toUnmodifiableMap(li -> li.ext, li -> li));
 
 	public GhidraalPlugin(PluginTool tool) {
 		super(tool, true, true);
 	}
 
-	static boolean done = false;
-	static GhidraScriptProvider removed_python_provider = null;
-
 	@Override
 	public void init() {
 		super.init();
-		System.err.printf("Ghidraal plugin init\n");
-		ConsoleService consoleService = tool.getService(ConsoleService.class);
-		if (!done) {
-			done = true;
-			Map<String, Language> allLangs = Engine.newBuilder().build().getLanguages();
 
-			// remove Provider registered for .py handling
-			Iterator<GhidraScriptProvider> it = GhidraScriptUtil.getProviders().iterator();
-			while (it.hasNext()) {
-				GhidraScriptProvider p = it.next();
-				if (p.getExtension().equals(".py")) {
-					System.err.printf("removing old python provider\n");
-					removed_python_provider = p;
-					it.remove();
+		if (!TRIED_TO_MODIFY_PROVIDERS) {
+			injectGhidraalProviders();
+		}
+		addConsoles();
+	}
 
-					if (consoleService != null) {
-						PrintWriter stdout = consoleService.getStdOut();
-						if (stdout != null) {
-							stdout.printf("Removed old .py provider, %s\n", p);
-						}
-					}
-				}
-			}
-			System.err.printf("adding our providers\n");
+	/** once per Ghidra instance */
+	void injectGhidraalProviders() {
+		TRIED_TO_MODIFY_PROVIDERS = true;
 
-			GhidraScriptUtil.getProviders()
-					.addAll(ext2li.values()
-							.stream()
-							.filter(li -> allLangs.containsKey(li.langid))
-							.map(GhidraalScriptProviderBase::new)
-							.collect(Collectors.toUnmodifiableList()));
+		PrintWriter out = new PrintWriter(System.err);
+		Map<String, Language> allLangs = Engine.newBuilder().build().getLanguages();
 
-			System.err.printf("all providers:\n");
-			for (GhidraScriptProvider p : GhidraScriptUtil.getProviders()) {
-				System.err.printf("  %s %s\n", p.getExtension(), p.getDescription());
+		// remove Provider registered for .py handling
+		Iterator<GhidraScriptProvider> providerIterator =
+			GhidraScriptUtil.getProviders().iterator();
+		while (providerIterator.hasNext()) {
+			GhidraScriptProvider provider = providerIterator.next();
+			if (provider.getExtension().equals(".py")) {
+				out.printf("removing jython script provider\n");
+				REMOVED_JYTHON_PROVIDER = provider;
+				providerIterator.remove();
+				out.printf("removed jython .py script provider, %s\n", provider);
 			}
 		}
 
-		addInterpreters();
+		out.printf("adding ghidraal script providers\n");
+
+		GhidraScriptUtil.getProviders()
+				.addAll(langInfos.stream()
+						.filter(li -> allLangs.containsKey(li.langId))
+						.map(GhidraalScriptProviderBase::new)
+						.collect(Collectors.toUnmodifiableList()));
+
+		out.printf("all providers:\n");
+		for (GhidraScriptProvider p : GhidraScriptUtil.getProviders()) {
+			out.printf("  %s %s\n", p.getExtension(), p.getDescription());
+		}
 	}
 
-	void addInterpreters() {
-		DockingAction action = new DockingAction("Python3 console", this.getName()) {
+	void addConsoles() {
+		for (LangInfo langInfo : langInfos) {
+			DockingAction action =
+				new DockingAction("create_ghidraal_" + langInfo.langId + "_console", this.getName()) {
+					@Override
+					public void actionPerformed(ActionContext context) {
+						try {
+							new GhidraalConsole(langInfo) {
+								protected void initializeGraalContext() throws IOException {
+									super.initializeGraalContext();
+									ctx.putGlobal("tool", tool);
+									ctx.putGlobal("currentProgram", currentProgram);
+									ctx.putGlobal("currentLocation", currentLocation);
+									ctx.putGlobal("currentSelection", currentSelection);
+									ctx.putGlobal("currentHighlight", currentHighlight);
+									ctx.putGlobal(LangInfo.API_VARNAME,
+										new FlatProgramAPI(currentProgram));
 
-			@Override
-			public void actionPerformed(ActionContext context) {
-				new GhidraalConsole() {
-					protected void initializeGraalContext() {
-						super.initializeGraalContext();
-						ctx.getBindings(langId).putMember("currentProgram", currentProgram);
-						ctx.getBindings(langId).putMember("currentLocation", currentLocation);
-						ctx.getBindings(langId).putMember("currentSelection", currentSelection);
-						ctx.getBindings(langId)
-								.putMember("api", new FlatProgramAPI(currentProgram));
+									ctx.evalResource("_ghidraal_initscript");
+								}
+
+								protected void welcome(PrintWriter out) {
+									super.welcome(out);
+									out.println(
+										"  globals defined: tool, currentProgram, currentLocation");
+									out.println(
+										"    and the methods of _ghidra_api, a FlatProgramAPI object for currentProgram");
+
+								}
+							}.create(tool);
+						}
+						catch (IOException e) {
+							e.printStackTrace();
+						}
 					}
-				}.create(tool);
-			}
-		};
-		action.setMenuBarData(
-			new MenuData(new String[] { "&Window", "GraalVM Console - Python3" }));
-		tool.addAction(action);
+				};
+			action.setMenuBarData(new MenuData(
+				new String[] { "&Window", "New ghidraal Console for " + langInfo.langId }));
+			action.setDescription(
+				"Create and show a new ghidraal console for " + langInfo.langId);
+			tool.addAction(action);
+		}
 	}
 
 	@Override
 	protected void dispose() {
-		if (done) {
+		if (TRIED_TO_MODIFY_PROVIDERS) {
 			List<GhidraScriptProvider> providers = GhidraScriptUtil.getProviders();
-			if (removed_python_provider != null) {
-				providers.add(removed_python_provider);
-				removed_python_provider = null;
+			if (REMOVED_JYTHON_PROVIDER != null) {
+				providers.add(REMOVED_JYTHON_PROVIDER);
+				REMOVED_JYTHON_PROVIDER = null;
 			}
 			Iterator<GhidraScriptProvider> it = GhidraScriptUtil.getProviders().iterator();
 			while (it.hasNext()) {
@@ -184,7 +151,7 @@ public class GhidraalPlugin extends ProgramPlugin {
 					it.remove();
 				}
 			}
-			done = false;
+			TRIED_TO_MODIFY_PROVIDERS = false;
 		}
 	}
 }

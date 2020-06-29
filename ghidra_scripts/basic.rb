@@ -10,3 +10,4 @@ bar
 $currentProgram.getFunctionManager.getFunctions(true).forEach(-> f {
   puts "#{f.getEntryPoint.toString} #{f.getName}"
 })
+

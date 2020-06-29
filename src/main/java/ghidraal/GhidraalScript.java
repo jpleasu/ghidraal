@@ -1,26 +1,21 @@
 package ghidraal;
 
-import java.io.*;
-import java.util.Vector;
-
-import org.graalvm.polyglot.*;
+import org.graalvm.polyglot.PolyglotException;
 
 import generic.jar.ResourceFile;
 import ghidra.app.script.GhidraScript;
 import ghidra.app.services.ConsoleService;
 import ghidra.util.Swing;
-import resources.ResourceManager;
 
 public class GhidraalScript extends GhidraScript {
+	final LangInfo langInfo;
+
 	protected String storedContextName;
+	protected ScriptingContext ctx;
 
-	Context ctx;
-
-	final GhidraalPlugin.LangInfo li;
-
-	public GhidraalScript(GhidraalPlugin.LangInfo li) {
-		this.li = li;
-		storedContextName = "ghidraaal_" + li.ext + "_stored_context";
+	public GhidraalScript(LangInfo langInfo) {
+		this.langInfo = langInfo;
+		storedContextName = "ghidraaal_" + langInfo.extension + "_stored_context";
 	}
 
 	@Override
@@ -35,93 +30,30 @@ public class GhidraalScript extends GhidraScript {
 		});
 	}
 
-	protected void eval(String resource) throws IOException {
-		resource = resource + li.ext;
-		try (InputStreamReader reader =
-			new InputStreamReader(ResourceManager.getResourceAsStream(resource))) {
-			Source init_source = Source.newBuilder(li.langid, reader, resource).build();
-			ctx.eval(init_source);
-		}
-	}
-
-	protected OutputStream os(final Writer w) {
-		return new OutputStream() {
-			@Override
-			public void write(int b) throws IOException {
-				w.write(b);
-			}
-		};
-	}
-
-	void putGlobal(String identifier, Object value) {
-		pb.putMember(identifier, value);
-	}
-
-	protected Value pgb;
-	protected Value pb;
-
 	protected void doRun() throws Exception {
 		ConsoleService consoleservice = state.getTool().getService(ConsoleService.class);
-		ctx = (Context) state.getEnvironmentVar(storedContextName);
+		ctx = (ScriptingContext) state.getEnvironmentVar(storedContextName);
 
 		try {
 			if (ctx == null) {
-			// @formatter:off
-			ctx = Context.newBuilder(li.langid)
-					.allowAllAccess(true)
-					.out(os(consoleservice.getStdOut()))
-					.err(os(consoleservice.getStdErr()))
-					.options(li.options)
-					.build();
-			// @formatter:on
-				state.addEnvironmentVar(storedContextName, ctx);
-				eval("_ghidraal_initctx");
+				ctx = langInfo.newScriptingContext();
+				ctx.init(consoleservice);
 			}
-			pgb = ctx.getPolyglotBindings();
-			pb = ctx.getBindings(li.langid);
+			ctx.putGlobal(LangInfo.API_VARNAME, this);
+			ctx.putGlobal("tool", state.getTool());
+			ctx.putGlobal("currentProgram", currentProgram);
+			ctx.putGlobal("currentAddress", currentAddress);
+			ctx.putGlobal("currentLocation", currentLocation);
+			ctx.putGlobal("currentHighlight", currentHighlight);
+			ctx.putGlobal("monitor", monitor);
 
-			putGlobal("gs", this);
-			putGlobal("tool", state.getTool());
-			putGlobal("currentProgram", currentProgram);
-			putGlobal("currentAddress", currentAddress);
-			putGlobal("currentLocation", currentLocation);
-			putGlobal("currentHighlight", currentHighlight);
-			putGlobal("monitor", monitor);
-
-			eval("_ghidraal_initscript");
+			ctx.evalResource("_ghidraal_initscript");
 
 			ResourceFile f = getSourceFile();
-			run(f.getName(), f.getInputStream());
+			ctx.evalWithReporting(f.getName(), f.getInputStream());
 		}
 		catch (PolyglotException e) {
 			e.printStackTrace(consoleservice.getStdErr());
 		}
-	}
-
-	protected void run(String scriptName, InputStream scriptContents) throws IOException {
-		try (InputStreamReader reader = new InputStreamReader(scriptContents)) {
-			Source source = Source.newBuilder(li.langid, reader, scriptName).build();
-			ctx.eval(source);
-		}
-	}
-
-	static protected InputStream wrap(String pre, InputStream stream, String post) {
-		Vector<InputStream> v = new Vector<>(2);
-		v.addElement(new ByteArrayInputStream(pre.getBytes()));
-		v.addElement(stream);
-		v.addElement(new ByteArrayInputStream(post.getBytes()));
-		return new SequenceInputStream(v.elements());
-	}
-
-	public static void main(String[] args) {
-		Context ctx = Context.newBuilder("ruby").allowAllAccess(true).build();
-		Value pb = ctx.getBindings("ruby");
-		for (String k : pb.getMemberKeys()) {
-			System.err.printf("%s\n", k);
-		}
-
-		Value pgb = ctx.getPolyglotBindings();
-		pgb.putMember("v", 7);
-		ctx.eval("ruby", "v=Polyglot.import('v')\n");
 	}
 }

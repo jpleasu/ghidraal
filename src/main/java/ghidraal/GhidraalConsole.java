@@ -4,12 +4,11 @@ import java.awt.event.*;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import javax.swing.*;
 
-import org.graalvm.polyglot.*;
+import org.graalvm.polyglot.PolyglotException;
+import org.graalvm.polyglot.Value;
 
 import docking.ActionContext;
 import docking.action.DockingAction;
@@ -19,94 +18,80 @@ import ghidra.app.plugin.core.interpreter.*;
 import ghidra.framework.plugintool.ServiceProvider;
 import ghidra.util.Msg;
 import ghidra.util.Swing;
+import ghidraal.ScriptingContext.CompletionData;
 import resources.Icons;
 
 public class GhidraalConsole {
-	String langId = "python";
 	String prompt = ">>>";
 	String morePrompt = "...";
 
-	// when tab is hit, this pattern has two capture groups, e.g. 
-	//   (x.x.x).(y)
-	// if this pattern matches when tab is pressed, we lookup the first group
-	// and return its members filtered by the second group.
-	Pattern completionPattern = Pattern.compile(".*?(?:([a-zA-Z0-9._$]*)\\.)?([a-zA-Z0-9_$]*)$");
+	final LangInfo langInfo;
 
-	// override to get members from within the language
-	protected Set<String> getMembers(String varName) {
-		Set<String> members = new HashSet<>();
-		try {
-			Value dirOutput = ctx.eval(langId, "dir(" + varName + ")");
-			if (dirOutput.hasArrayElements()) {
-				for (int i = 0; i < dirOutput.getArraySize(); ++i) {
-					members.add(dirOutput.getArrayElement(i).asString());
-				}
-			}
-		}
-		catch (PolyglotException e) {
-			// oh well
-		}
-		return members;
-	}
-
-	protected void initializeGraalContext() {
-		ctx = Context.newBuilder(langId)
-				.allowAllAccess(true)
-				.out(console.getStdOut())
-				.in(console.getStdin())
-				.err(console.getStdErr())
-				.build();
-	}
-
-	protected Context ctx;
+	protected ScriptingContext ctx;
 
 	protected InterpreterConsole console;
+
 	protected MyInterpreterConnection interpreter;
+
 	protected MyInputThread inputThread;
 
-	public void initializeConsole() {
-		PrintWriter out = console.getOutWriter();
-		out.println("GraalVM Console - " + langId);
+	public GhidraalConsole(LangInfo langInfo) {
+		this.langInfo = langInfo;
+	}
+
+	protected void initializeGraalContext() throws IOException {
+		ctx = langInfo.newScriptingContext();
+		ctx.init(console.getStdin(), console.getStdOut(), console.getStdErr());
+	}
+
+	protected void welcome(PrintWriter out) {
+		out.println("GraalVM Console - " + langInfo.langId);
 		out.println("  press TAB for member lookup");
 		out.println("  press SHIFT-ENTER to continue input on next line");
+	}
+
+	// must be run in swing thread
+	protected void initializeConsole(ServiceProvider serviceProvider) {
+		console = serviceProvider.getService(InterpreterPanelService.class)
+				.createInterpreterPanel(interpreter, true);
+
+		PrintWriter out = console.getOutWriter();
+		welcome(out);
 		console.addFirstActivationCallback(this::onFirstActivation);
 
-		Swing.runNow(() -> {
-			InterpreterComponentProvider provider = (InterpreterComponentProvider) console;
+		InterpreterComponentProvider provider = (InterpreterComponentProvider) console;
 
-			DockingAction disposeAction =
-				new DockingAction("Remove Interpreter", provider.getName()) {
-					@Override
-					public void actionPerformed(ActionContext context) {
-						console.dispose();
-						inputThread.dispose();
-						inputThread = null;
-					}
-				};
-			disposeAction.setDescription("Remove interpreter from tool");
-			disposeAction.setToolBarData(new ToolBarData(Icons.STOP_ICON, null));
-			disposeAction.setEnabled(true);
-			console.addAction(disposeAction);
+		DockingAction disposeAction = new DockingAction("Remove Interpreter", provider.getName()) {
+			@Override
+			public void actionPerformed(ActionContext context) {
+				console.dispose();
+				inputThread.dispose();
+				inputThread = null;
+			}
+		};
+		disposeAction.setDescription("Remove interpreter from tool");
+		disposeAction.setToolBarData(new ToolBarData(Icons.STOP_ICON, null));
+		disposeAction.setEnabled(true);
+		console.addAction(disposeAction);
 
-			// add a key listener for shift-enter
-			InterpreterPanel panel = (InterpreterPanel) provider.getComponent();
-			JPanel interiorPanel = (JPanel) panel.getComponent(1);
-			JTextPane inputTextPane = (JTextPane) interiorPanel.getComponent(1);
-			inputTextPane.addKeyListener(new KeyAdapter() {
-				@SuppressWarnings("deprecation")
-				@Override
-				public void keyPressed(KeyEvent e) {
-					if (e.getKeyCode() == KeyEvent.VK_ENTER &&
-						e.getModifiersEx() == InputEvent.SHIFT_DOWN_MASK) {
+		// add a key listener for shift-enter
+		InterpreterPanel panel = (InterpreterPanel) provider.getComponent();
+		JPanel interiorPanel = (JPanel) panel.getComponent(1);
+		JTextPane inputTextPane = (JTextPane) interiorPanel.getComponent(1);
+		inputTextPane.addKeyListener(new KeyAdapter() {
+			@SuppressWarnings("deprecation")
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ENTER &&
+					e.getModifiersEx() == InputEvent.SHIFT_DOWN_MASK) {
 
-						inputThread.wantsMore.set(true);
+					inputThread.wantsMore.set(true);
 
-						// remove the shift modifier so that the text pane treats this even
-						// like an enter
-						e.setModifiers(0);
-					}
+					// remove the shift modifier so that the text pane treats this event
+					// like an enter
+					e.setModifiers(0);
 				}
-			});
+			}
 		});
 	}
 
@@ -119,14 +104,12 @@ public class GhidraalConsole {
 		inputThread.start();
 	}
 
-	public void create(ServiceProvider serviceProvider) {
+	public void create(ServiceProvider serviceProvider) throws IOException {
 		interpreter = new MyInterpreterConnection();
 
 		Swing.runNow(() -> {
-			console = serviceProvider.getService(InterpreterPanelService.class)
-					.createInterpreterPanel(interpreter, true);
+			initializeConsole(serviceProvider);
 		});
-		initializeConsole();
 		initializeGraalContext();
 	}
 
@@ -134,7 +117,7 @@ public class GhidraalConsole {
 
 		@Override
 		public String getTitle() {
-			return "GraalVM Console - " + langId;
+			return "Ghidraal console for " + langInfo.langId;
 		}
 
 		@Override
@@ -144,19 +127,20 @@ public class GhidraalConsole {
 
 		@Override
 		public List<CodeCompletion> getCompletions(String cmd) {
-			Matcher m = completionPattern.matcher(cmd);
-			Value value = null;
-			String memberDisplayPrefix = "";
+			Value object = null;
+			String varNameWithAccessor = "";
 			String memberPrefix = "";
 			String varName = null;
-			if (m.matches()) {
-				varName = m.group(1);
-				memberPrefix = m.group(2);
+
+			CompletionData completionData = ctx.matchCompletionPattern(cmd);
+			if (completionData != null) {
+				varName = completionData.varName;
+				memberPrefix = completionData.memberPrefix;
 				if (varName != null) {
 					try {
-						value = ctx.eval(langId, varName);
-						if (value != null) {
-							memberDisplayPrefix = varName + ".";
+						object = ctx.eval(varName);
+						if (object != null) {
+							varNameWithAccessor = varName + completionData.accessor;
 						}
 					}
 					catch (PolyglotException e) {
@@ -164,24 +148,31 @@ public class GhidraalConsole {
 					}
 				}
 			}
-			if (value == null) {
-				value = ctx.getBindings(langId);
+
+			// completionData wasn't found, or we don't trust it since no variable was found
+			if (object == null) {
+				varName = null;
+				object = ctx.getGlobalObject();
 			}
-			List<CodeCompletion> completions = new ArrayList<>();
+
+			// members are sorted by length, then lexicographically
 			Set<String> members = new TreeSet<>((a, b) -> {
 				int c = Integer.compare(a.length(), b.length());
 				if (c == 0)
 					c = a.compareTo(b);
 				return c;
 			});
-			members.addAll(value.getMemberKeys());
+
+			members.addAll(object.getMemberKeys());
 			if (varName != null) {
-				members.addAll(getMembers(varName));
+				members.addAll(ctx.getMembersFromIntrospection(varName));
 			}
 
+			// now filter with our prefix and construct CodeCompletion objects
+			List<CodeCompletion> completions = new ArrayList<>();
 			for (String member : members) {
 				if (member.startsWith(memberPrefix)) {
-					completions.add(new CodeCompletion(memberDisplayPrefix + member,
+					completions.add(new CodeCompletion(varNameWithAccessor + member,
 						member.substring(memberPrefix.length()), null));
 				}
 			}
@@ -232,7 +223,7 @@ public class GhidraalConsole {
 					sb.append(line);
 
 					try {
-						Value result = ctx.eval(langId, sb.toString());
+						Value result = ctx.eval(sb.toString());
 						out.printf("%s\n", result);
 					}
 					catch (PolyglotException e) {

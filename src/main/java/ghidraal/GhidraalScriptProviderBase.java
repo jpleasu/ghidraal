@@ -8,15 +8,15 @@ import ghidra.app.script.GhidraScriptProvider;
 
 // class name mustn't end with provider, or ClassSearcher will find it
 public class GhidraalScriptProviderBase extends GhidraScriptProvider {
-	final GhidraalPlugin.LangInfo li;
+	final LangInfo langInfo;
 
-	public GhidraalScriptProviderBase(GhidraalPlugin.LangInfo li) {
-		this.li = li;
+	public GhidraalScriptProviderBase(LangInfo langInfo) {
+		this.langInfo = langInfo;
 	}
 
 	@Override
 	public String getDescription() {
-		return "graal" + li.langid;
+		return "graal" + langInfo.langId;
 	}
 
 	@Override
@@ -31,18 +31,18 @@ public class GhidraalScriptProviderBase extends GhidraScriptProvider {
 
 	@Override
 	public String getCommentCharacter() {
-		return li.comment;
+		return langInfo.comment;
 	}
 
 	@Override
 	public String getExtension() {
-		return li.ext;
+		return langInfo.extension;
 	}
 
 	@Override
 	public GhidraScript getScriptInstance(ResourceFile sourceFile, PrintWriter writer)
 			throws ClassNotFoundException, InstantiationException, IllegalAccessException {
-		GhidraalScript scr = li.newScript();
+		GhidraalScript scr = langInfo.newScript();
 		scr.setSourceFile(sourceFile);
 		return scr;
 	}

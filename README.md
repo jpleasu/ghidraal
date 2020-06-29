@@ -52,9 +52,21 @@ There are some extremely basic scripts for each supported language in the
 [ghidra_scripts](/ghidra_scripts) directory.  When the extension is installed,
 they should become visible in the Script Manager.
 
+An interactive console for each language is available under the code browser "Window"
+menu option.
+
 Note: Ghidraal hijacks the `.py` extension by unloading the Jython script
 provider!  Disable `GhidraalPlugin` to reenable Jython.
 
 Note: Ghidra's built in Python scripts are Python 2, so won't work with Ghidraal's Python 3.  Some
 can be ported automatically with `2to3`.
 
+
+
+# changelog
+
+- ghidraal-0.0.2
+    - added interactive consoles
+    - made basic.py like the other basic scripts
+- ghidraal-0.0.1
+    - initial

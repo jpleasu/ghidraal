@@ -1,3 +1,3 @@
-for(x in gs) {
-  global[x]=gs[x];
+for(x in _ghidra_api) {
+  global[x]=_ghidra_api[x];
 }
