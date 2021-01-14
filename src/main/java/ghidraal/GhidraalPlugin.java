@@ -1,10 +1,12 @@
 package ghidraal;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import org.graalvm.polyglot.*;
+import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.Language;
 
 import docking.ActionContext;
 import docking.action.DockingAction;
@@ -59,7 +61,7 @@ public class GhidraalPlugin extends ProgramPlugin {
 	}
 
 	/** once per Ghidra instance */
-	void injectGhidraalProviders() {
+	static void injectGhidraalProviders() {
 		TRIED_TO_MODIFY_PROVIDERS = true;
 
 		PrintWriter out = new PrintWriter(System.err);
@@ -94,44 +96,43 @@ public class GhidraalPlugin extends ProgramPlugin {
 
 	void addConsoles() {
 		for (LangInfo langInfo : langInfos) {
-			DockingAction action =
-				new DockingAction("create_ghidraal_" + langInfo.langId + "_console", this.getName()) {
-					@Override
-					public void actionPerformed(ActionContext context) {
-						try {
-							new GhidraalConsole(langInfo) {
-								protected void initializeGraalContext() throws IOException {
-									super.initializeGraalContext();
-									ctx.putGlobal("tool", tool);
-									ctx.putGlobal("currentProgram", currentProgram);
-									ctx.putGlobal("currentLocation", currentLocation);
-									ctx.putGlobal("currentSelection", currentSelection);
-									ctx.putGlobal("currentHighlight", currentHighlight);
-									ctx.putGlobal(LangInfo.API_VARNAME,
-										new FlatProgramAPI(currentProgram));
+			DockingAction action = new DockingAction(
+				"create_ghidraal_" + langInfo.langId + "_console", this.getName()) {
+				@Override
+				public void actionPerformed(ActionContext context) {
+					try {
+						new GhidraalConsole(langInfo) {
+							protected void initializeGraalContext() throws IOException {
+								super.initializeGraalContext();
+								ctx.putGlobal("tool", tool);
+								ctx.putGlobal("currentProgram", currentProgram);
+								ctx.putGlobal("currentLocation", currentLocation);
+								ctx.putGlobal("currentSelection", currentSelection);
+								ctx.putGlobal("currentHighlight", currentHighlight);
+								ctx.putGlobal(LangInfo.API_VARNAME,
+									new FlatProgramAPI(currentProgram));
 
-									ctx.evalResource("_ghidraal_initscript");
-								}
+								ctx.evalResource("_ghidraal_initscript");
+							}
 
-								protected void welcome(PrintWriter out) {
-									super.welcome(out);
-									out.println(
-										"  globals defined: tool, currentProgram, currentLocation");
-									out.println(
-										"    and the methods of _ghidra_api, a FlatProgramAPI object for currentProgram");
+							protected void welcome(PrintWriter out) {
+								super.welcome(out);
+								out.println(
+									"  globals defined: tool, currentProgram, currentLocation");
+								out.println(
+									"    and the methods of _ghidra_api, a FlatProgramAPI object for currentProgram");
 
-								}
-							}.create(tool);
-						}
-						catch (IOException e) {
-							e.printStackTrace();
-						}
+							}
+						}.create(tool);
 					}
-				};
+					catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			};
 			action.setMenuBarData(new MenuData(
 				new String[] { "&Window", "New ghidraal Console for " + langInfo.langId }));
-			action.setDescription(
-				"Create and show a new ghidraal console for " + langInfo.langId);
+			action.setDescription("Create and show a new ghidraal console for " + langInfo.langId);
 			tool.addAction(action);
 		}
 	}

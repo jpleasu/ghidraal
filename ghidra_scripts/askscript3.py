@@ -1,4 +1,4 @@
-# An example of asking for user input.
+# An example of asking for user input. (from Examples.Python run through 2to3)
 
 # Note the ability to pre-populate values for some of these variables when AskScript.properties file exists.
 # Also notice how the previous input is saved.
@@ -6,7 +6,7 @@
 # DISCLAIMER: This is a recreation of a Java Ghidra script for example
 # use only. Please run the Java version in a production environment.
 
-#@category Examples.Python
+#@category Ghidraal
 
 from ghidra.framework.model import DomainFile
 from ghidra.framework.model import DomainFolder

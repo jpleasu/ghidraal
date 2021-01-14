@@ -1,6 +1,6 @@
 D="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd -P "$( dirname "$SOURCE" )" && pwd )"
  
-ver=20.1.0
+ver=20.3.0
 if [ ! -d $D/graalvm-ce-java11-${ver} ]; then
   pushd $D
   wget https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${ver}/graalvm-ce-java11-linux-amd64-${ver}.tar.gz

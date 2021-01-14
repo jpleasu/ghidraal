@@ -1,3 +1,6 @@
+# Basic ruby demo
+#@category Ghidraal
+
 print <<"foo", <<"bar"  # you can stack them
   I said foo.
 foo

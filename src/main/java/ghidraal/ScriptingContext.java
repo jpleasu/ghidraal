@@ -9,7 +9,6 @@ import java.util.regex.Pattern;
 import org.graalvm.polyglot.*;
 import org.graalvm.polyglot.Context.Builder;
 
-import ghidra.app.services.ConsoleService;
 import resources.ResourceManager;
 
 /**
@@ -70,22 +69,19 @@ public class ScriptingContext {
 		initFields();
 	}
 
-	public void init(ConsoleService consoleservice) throws IOException {
-		buildAndInit(Context.newBuilder(langInfo.langId)
-				.allowAllAccess(true)
-				.out(Util.asOutputStream(consoleservice.getStdOut()))
-				.err(Util.asOutputStream(consoleservice.getStdErr()))
-				.options(langInfo.options));
-	}
-
 	public void init(InputStream stdin, OutputStream stdOut, OutputStream stdErr)
 			throws IOException {
-		buildAndInit(Context.newBuilder(langInfo.langId)
+		Builder builder = Context.newBuilder(langInfo.langId)
 				.allowAllAccess(true)
-				.in(stdin)
 				.out(stdOut)
 				.err(stdErr)
-				.options(langInfo.options));
+				.options(langInfo.options);
+
+		if (stdin != null) {
+			builder.in(stdin);
+		}
+
+		buildAndInit(builder);
 	}
 
 	/** using introspection (e.g. not Value.getMemberKeys) return members of {@code varName}. 

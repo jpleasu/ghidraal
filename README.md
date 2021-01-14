@@ -24,7 +24,7 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
       e.g.
         ```bash
         # in the directory containing your checkout of this repo 
-        ln -s ~/ghidra_9.1.2_PUBLIC ghidra
+        ln -s ~/ghidra_9.2.1_PUBLIC ghidra
         . ~/graalvm/env.sh # must build with Graal available
         gradle
         ls dist/

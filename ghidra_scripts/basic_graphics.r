@@ -1,10 +1,10 @@
-#R graphics demo
+# Basic R graphics demo
 #@category Ghidraal
 
 library(grid)
 
 # install from R repl with
-#    packages.install('ggplot2')
+#    install.packages('ggplot2')
 library(ggplot2)
 
 # create image and register graphics

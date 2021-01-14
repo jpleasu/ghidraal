@@ -1,11 +1,15 @@
 package ghidraal;
 
+import java.io.InputStream;
+import java.io.OutputStream;
+
 import org.graalvm.polyglot.PolyglotException;
 
 import generic.jar.ResourceFile;
 import ghidra.app.script.GhidraScript;
 import ghidra.app.services.ConsoleService;
 import ghidra.util.Swing;
+import ghidra.util.SystemUtilities;
 
 public class GhidraalScript extends GhidraScript {
 	final LangInfo langInfo;
@@ -20,40 +24,43 @@ public class GhidraalScript extends GhidraScript {
 
 	@Override
 	protected void run() throws Exception {
-		Swing.runNow(() -> {
-			try {
-				doRun();
-			}
-			catch (Exception e) {
-				e.printStackTrace();
-			}
-		});
+		ctx = (ScriptingContext) state.getEnvironmentVar(storedContextName);
+		if (SystemUtilities.isInHeadlessMode()) {
+			doRun(System.in, System.out, System.err);
+		}
+		else {
+			Swing.runNow(() -> {
+				ConsoleService consoleservice = state.getTool().getService(ConsoleService.class);
+				try {
+					doRun(null, Util.asOutputStream(consoleservice.getStdOut()),
+						Util.asOutputStream(consoleservice.getStdErr()));
+				}
+				catch (PolyglotException e) {
+					e.printStackTrace(consoleservice.getStdErr());
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+				}
+			});
+		}
 	}
 
-	protected void doRun() throws Exception {
-		ConsoleService consoleservice = state.getTool().getService(ConsoleService.class);
-		ctx = (ScriptingContext) state.getEnvironmentVar(storedContextName);
-
-		try {
-			if (ctx == null) {
-				ctx = langInfo.newScriptingContext();
-				ctx.init(consoleservice);
-			}
-			ctx.putGlobal(LangInfo.API_VARNAME, this);
-			ctx.putGlobal("tool", state.getTool());
-			ctx.putGlobal("currentProgram", currentProgram);
-			ctx.putGlobal("currentAddress", currentAddress);
-			ctx.putGlobal("currentLocation", currentLocation);
-			ctx.putGlobal("currentHighlight", currentHighlight);
-			ctx.putGlobal("monitor", monitor);
-
-			ctx.evalResource("_ghidraal_initscript");
-
-			ResourceFile f = getSourceFile();
-			ctx.evalWithReporting(f.getName(), f.getInputStream());
+	protected void doRun(InputStream in, OutputStream out, OutputStream err) throws Exception {
+		if (ctx == null) {
+			ctx = langInfo.newScriptingContext();
+			ctx.init(in, out, err);
 		}
-		catch (PolyglotException e) {
-			e.printStackTrace(consoleservice.getStdErr());
-		}
+		ctx.putGlobal(LangInfo.API_VARNAME, this);
+		ctx.putGlobal("tool", state.getTool());
+		ctx.putGlobal("currentProgram", currentProgram);
+		ctx.putGlobal("currentAddress", currentAddress);
+		ctx.putGlobal("currentLocation", currentLocation);
+		ctx.putGlobal("currentHighlight", currentHighlight);
+		ctx.putGlobal("monitor", monitor);
+
+		ctx.evalResource("_ghidraal_initscript");
+
+		ResourceFile f = getSourceFile();
+		ctx.evalWithReporting(f.getName(), f.getInputStream());
 	}
 }

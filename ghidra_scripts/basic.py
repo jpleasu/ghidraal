@@ -1,3 +1,6 @@
+# Basic Python 3 demo
+#@category Ghidraal
+
 def dump(f):
   print(f'{f.getEntryPoint().toString()} {f.getName()}')
 
