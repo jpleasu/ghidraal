@@ -14,7 +14,7 @@ import resources.ResourceManager;
 /**
  * wrapper of GraalVM context with higher level abstractions for scripting.
  */
-public class ScriptingContext {
+public class ScriptingContext implements AutoCloseable {
 	protected Context ctx;
 
 	protected Value polyglotBindings;
@@ -32,7 +32,8 @@ public class ScriptingContext {
 
 	public Value evalInputStream(String name, InputStream inputStream) throws IOException {
 		try (InputStreamReader reader = new InputStreamReader(inputStream)) {
-			Source init_source = Source.newBuilder(langInfo.langId, reader, name).build();
+			Source init_source =
+				Source.newBuilder(langInfo.langId, reader, name).cached(false).build();
 			return ctx.eval(init_source);
 		}
 	}
@@ -72,6 +73,7 @@ public class ScriptingContext {
 	public void init(InputStream stdin, OutputStream stdOut, OutputStream stdErr)
 			throws IOException {
 		Builder builder = Context.newBuilder(langInfo.langId)
+				// .engine(shared_engine) // caused native code issues with both python and fastr
 				.allowAllAccess(true)
 				.out(stdOut)
 				.err(stdErr)
@@ -133,6 +135,11 @@ public class ScriptingContext {
 			return new CompletionData(matcher.group(1), matcher.group(2), matcher.group(3));
 		}
 		return null;
+	}
+
+	@Override
+	public void close() {
+		ctx.close(true);
 	}
 
 }

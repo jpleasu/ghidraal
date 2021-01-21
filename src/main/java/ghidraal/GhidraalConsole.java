@@ -40,8 +40,16 @@ public class GhidraalConsole {
 	}
 
 	protected void initializeGraalContext() throws IOException {
+		if (ctx != null) {
+			closeGraalContext();
+		}
 		ctx = langInfo.newScriptingContext();
 		ctx.init(console.getStdin(), console.getStdOut(), console.getStdErr());
+	}
+
+	protected void closeGraalContext() {
+		ctx.close();
+		ctx = null;
 	}
 
 	protected void welcome(PrintWriter out) {
@@ -57,7 +65,7 @@ public class GhidraalConsole {
 
 		PrintWriter out = console.getOutWriter();
 		welcome(out);
-		console.addFirstActivationCallback(this::onFirstActivation);
+		console.addFirstActivationCallback(this::onFirstConsoleActivation);
 
 		InterpreterComponentProvider provider = (InterpreterComponentProvider) console;
 
@@ -67,6 +75,7 @@ public class GhidraalConsole {
 				console.dispose();
 				inputThread.dispose();
 				inputThread = null;
+				closeGraalContext();
 			}
 		};
 		disposeAction.setDescription("Remove interpreter from tool");
@@ -95,22 +104,27 @@ public class GhidraalConsole {
 		});
 	}
 
-	void onFirstActivation() {
+	void onFirstConsoleActivation() {
 		if (inputThread != null) {
 			inputThread.dispose();
 			inputThread = null;
 		}
-		inputThread = new MyInputThread();
-		inputThread.start();
+		try {
+			initializeGraalContext();
+			inputThread = new MyInputThread();
+			inputThread.start();
+		}
+		catch (IOException e) {
+			Msg.showError(this, null, "Error initializing GraalVM context", e);
+		}
 	}
 
-	public void create(ServiceProvider serviceProvider) throws IOException {
+	public void create(ServiceProvider serviceProvider) {
 		interpreter = new MyInterpreterConnection();
 
 		Swing.runNow(() -> {
 			initializeConsole(serviceProvider);
 		});
-		initializeGraalContext();
 	}
 
 	class MyInterpreterConnection implements InterpreterConnection {
@@ -243,4 +257,5 @@ public class GhidraalConsole {
 			shouldContinue.set(false);
 		}
 	}
+
 }

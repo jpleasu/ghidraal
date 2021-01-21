@@ -100,34 +100,27 @@ public class GhidraalPlugin extends ProgramPlugin {
 				"create_ghidraal_" + langInfo.langId + "_console", this.getName()) {
 				@Override
 				public void actionPerformed(ActionContext context) {
-					try {
-						new GhidraalConsole(langInfo) {
-							protected void initializeGraalContext() throws IOException {
-								super.initializeGraalContext();
-								ctx.putGlobal("tool", tool);
-								ctx.putGlobal("currentProgram", currentProgram);
-								ctx.putGlobal("currentLocation", currentLocation);
-								ctx.putGlobal("currentSelection", currentSelection);
-								ctx.putGlobal("currentHighlight", currentHighlight);
-								ctx.putGlobal(LangInfo.API_VARNAME,
-									new FlatProgramAPI(currentProgram));
+					new GhidraalConsole(langInfo) {
+						protected void initializeGraalContext() throws IOException {
+							super.initializeGraalContext();
+							ctx.putGlobal("tool", tool);
+							ctx.putGlobal("currentProgram", currentProgram);
+							ctx.putGlobal("currentLocation", currentLocation);
+							ctx.putGlobal("currentSelection", currentSelection);
+							ctx.putGlobal("currentHighlight", currentHighlight);
+							ctx.putGlobal(LangInfo.API_VARNAME, new FlatProgramAPI(currentProgram));
 
-								ctx.evalResource("_ghidraal_initscript");
-							}
+							ctx.evalResource("_ghidraal_initscript");
+						}
 
-							protected void welcome(PrintWriter out) {
-								super.welcome(out);
-								out.println(
-									"  globals defined: tool, currentProgram, currentLocation");
-								out.println(
-									"    and the methods of _ghidra_api, a FlatProgramAPI object for currentProgram");
+						protected void welcome(PrintWriter out) {
+							super.welcome(out);
+							out.println("  globals defined: tool, currentProgram, currentLocation");
+							out.println(
+								"    and the methods of _ghidra_api, a FlatProgramAPI object for currentProgram");
 
-							}
-						}.create(tool);
-					}
-					catch (IOException e) {
-						e.printStackTrace();
-					}
+						}
+					}.create(tool);
 				}
 			};
 			action.setMenuBarData(new MenuData(
