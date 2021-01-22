@@ -73,7 +73,7 @@ public class ScriptingContext implements AutoCloseable {
 	public void init(InputStream stdin, OutputStream stdOut, OutputStream stdErr)
 			throws IOException {
 		Builder builder = Context.newBuilder(langInfo.langId)
-				// .engine(shared_engine) // caused native code issues with both python and fastr
+				// .engine(shared_engine) // doesn't seem to improve script startup
 				.allowAllAccess(true)
 				.out(stdOut)
 				.err(stdErr)

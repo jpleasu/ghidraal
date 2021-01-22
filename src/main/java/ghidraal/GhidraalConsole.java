@@ -22,8 +22,9 @@ import ghidraal.ScriptingContext.CompletionData;
 import resources.Icons;
 
 public class GhidraalConsole {
-	String prompt = ">>>";
-	String morePrompt = "...";
+	static final String prompt = ">>>";
+	static final String morePrompt = "...";
+	static final String busyPrompt = "(busy)";
 
 	final LangInfo langInfo;
 
@@ -65,6 +66,7 @@ public class GhidraalConsole {
 
 		PrintWriter out = console.getOutWriter();
 		welcome(out);
+		console.setPrompt(busyPrompt);
 		console.addFirstActivationCallback(this::onFirstConsoleActivation);
 
 		InterpreterComponentProvider provider = (InterpreterComponentProvider) console;
@@ -237,8 +239,13 @@ public class GhidraalConsole {
 					sb.append(line);
 
 					try {
+						console.setInputPermitted(false);
+						console.setPrompt(busyPrompt);
 						Value result = ctx.eval(sb.toString());
-						out.printf("%s\n", result);
+						if (!result.isNull()) {
+							out.printf("%s\n", result);
+						}
+						console.setInputPermitted(true);
 					}
 					catch (PolyglotException e) {
 						e.printStackTrace(console.getErrWriter());

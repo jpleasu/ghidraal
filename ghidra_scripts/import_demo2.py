@@ -2,8 +2,8 @@
 #@category Ghidraal
 
 _ghidraal_use_jythonic_imports = False
-# subsequent import statements rely on GraalPython's java package to import
-# Java packages and classes
+# subsequent import statements rely on GraalPython's Python module "java" to
+# import Java packages and classes
 
 from java.ghidra.util import Msg
 Msg.showInfo(None, None, '1', '1')
