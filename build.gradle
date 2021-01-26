@@ -13,44 +13,71 @@
 // Gradle should be invoked from the directory of the project to build.  Please see the
 // application.gradle.version property in <GHIDRA_INSTALL_DIR>/Ghidra/application.properties
 // for the correction version of Gradle to use for the Ghidra installation you specify.
+if(project.parent!=null) {
+    apply from: "$rootProject.projectDir/gradle/distributableGhidraExtension.gradle"
+    apply from: "$rootProject.projectDir/gradle/javaProject.gradle"
+    apply from: "$rootProject.projectDir/gradle/javaTestProject.gradle"
+    //apply from: "$rootProject.projectDir/gradle/helpProject.gradle"
+    apply plugin: 'eclipse'
+    eclipse.project.name = 'Ghidraal'
+    
+    dependencies {
+            compile project(':Base')
+    }
+} else {
 
-apply plugin: 'java'
-
-repositories {
-  mavenCentral()
+    apply plugin: 'java'
+    
+    repositories {
+      mavenCentral()
+    }
+    
+    task copyDependencies(type: Copy) {
+      from configurations.compile
+        into 'lib'
+    }
+    
+    
+    def ghidraInstallDir
+    
+    if (System.env.GHIDRA_INSTALL_DIR) {
+      ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
+    }
+    else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
+      ghidraInstallDir = project.getProperty("GHIDRA_INSTALL_DIR")
+    } else if (project.file('ghidra').exists()) {
+      ghidraInstallDir = project.file('ghidra').getCanonicalPath()
+    }
+    
+    if(!gradle.startParameter.taskNames.contains('copyDependencies')) {
+      if (ghidraInstallDir) {
+        def f=new File(ghidraInstallDir, "support/buildExtension.gradle")
+        if(!f.exists()) {
+            apply from: "$rootProject.projectDir/gradle/distributableGhidraExtension.gradle"
+            apply from: "$rootProject.projectDir/gradle/javaProject.gradle"
+            apply from: "$rootProject.projectDir/gradle/javaTestProject.gradle"
+            apply from: "$rootProject.projectDir/gradle/helpProject.gradle"
+            apply plugin: 'eclipse'
+    
+            // dependencies { 
+            //     compile project('Base')
+            // }
+    
+        } else if(!f.exists()) {
+            throw new GradleException("couldn't find buildExtension.gradle!")
+        }
+        apply from: f.getCanonicalPath()
+      }
+      else {
+        throw new GradleException("GHIDRA_INSTALL_DIR is not defined!")
+      }
+    }
+    
+    // modify the buildExtension task to exclude the ghidra subdirectory
+    buildExtension.getMainSpec().getChildren().each { msc ->
+      if(msc.getSourcePaths()[0]==project.projectDir) {
+        msc.exclude('ghidra')
+      }
+    }
+    
 }
-
-task copyDependencies(type: Copy) {
-  from configurations.compile
-    into 'lib'
-
-}
-
-
-def ghidraInstallDir
-
-if (System.env.GHIDRA_INSTALL_DIR) {
-  ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
-}
-else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
-  ghidraInstallDir = project.getProperty("GHIDRA_INSTALL_DIR")
-} else if (project.file('ghidra').exists()) {
-  ghidraInstallDir = project.file('ghidra').getCanonicalPath()
-}
-
-if(!gradle.startParameter.taskNames.contains('copyDependencies')) {
-  if (ghidraInstallDir) {
-    apply from: new File(ghidraInstallDir).getCanonicalPath() + "/support/buildExtension.gradle"
-  }
-  else {
-    throw new GradleException("GHIDRA_INSTALL_DIR is not defined!")
-  }
-}
-
-// modify the buildExtension task to exclude the ghidra subdirectory
-buildExtension.getMainSpec().getChildren().each { msc ->
-  if(msc.getSourcePaths()[0]==project.projectDir) {
-    msc.exclude('ghidra')
-  }
-}
-
