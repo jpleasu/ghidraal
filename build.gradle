@@ -36,14 +36,12 @@ if(project.parent!=null) {
       from configurations.compile
         into 'lib'
     }
-    
-    
+        
     def ghidraInstallDir
     
     if (System.env.GHIDRA_INSTALL_DIR) {
       ghidraInstallDir = System.env.GHIDRA_INSTALL_DIR
-    }
-    else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
+    } else if (project.hasProperty("GHIDRA_INSTALL_DIR")) {
       ghidraInstallDir = project.getProperty("GHIDRA_INSTALL_DIR")
     } else if (project.file('ghidra').exists()) {
       ghidraInstallDir = project.file('ghidra').getCanonicalPath()
@@ -53,17 +51,6 @@ if(project.parent!=null) {
       if (ghidraInstallDir) {
         def f=new File(ghidraInstallDir, "support/buildExtension.gradle")
         if(!f.exists()) {
-            apply from: "$rootProject.projectDir/gradle/distributableGhidraExtension.gradle"
-            apply from: "$rootProject.projectDir/gradle/javaProject.gradle"
-            apply from: "$rootProject.projectDir/gradle/javaTestProject.gradle"
-            apply from: "$rootProject.projectDir/gradle/helpProject.gradle"
-            apply plugin: 'eclipse'
-    
-            // dependencies { 
-            //     compile project('Base')
-            // }
-    
-        } else if(!f.exists()) {
             throw new GradleException("couldn't find buildExtension.gradle!")
         }
         apply from: f.getCanonicalPath()
