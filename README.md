@@ -85,9 +85,14 @@ graalpython -m ginstall install --help
 # install pandas
 graalpython -m ginstall install pandas
 
+# after an upgrade of GraalVM, it might be necessary to reinstall packages
+graalpython -m ginstall uninstall numpy,pandas
+graalpython -m ginstall install pandas
+
 # although pip isn't 100% supported, some packages can be installed, e.g.
 graalpython -m ginstall pypi pyelftools
 ```
+
 
 
 # Ghidraal changelog
