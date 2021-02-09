@@ -238,17 +238,20 @@ public class GhidraalConsole {
 
 					sb.append(line);
 
+					console.setInputPermitted(false);
+					console.setPrompt(busyPrompt);
+
 					try {
-						console.setInputPermitted(false);
-						console.setPrompt(busyPrompt);
 						Value result = ctx.eval(sb.toString());
 						if (!result.isNull()) {
 							out.printf("%s\n", result);
 						}
-						console.setInputPermitted(true);
 					}
 					catch (PolyglotException e) {
 						e.printStackTrace(console.getErrWriter());
+					}
+					finally {
+						console.setInputPermitted(true);
 					}
 					sb.setLength(0);
 					console.setPrompt(prompt);
