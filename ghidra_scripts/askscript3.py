@@ -14,6 +14,7 @@ from ghidra.program.model.address import Address
 from ghidra.program.model.lang import LanguageCompilerSpecPair
 from ghidra.program.model.listing import Program
 from ghidra.util import Msg
+from java.util import Arrays
 
 from java.lang import IllegalArgumentException
 
@@ -69,14 +70,16 @@ try:
     choice = askChoice("Choice", "Please choose one", [ "grumpy", "dopey", "sleepy", "doc", "bashful" ], "bashful")
     print("Choice? " + choice)
 
-    choices1 = askChoices("Choices 1", "Please choose one or more numbers.", [ 1, 2, 3, 4, 5, 6 ])
+    # nb: GraalPython doesn't allow access to the Python list from the swing thread,
+    #     so we convert it with java.util.Arrays.asList
+    choices1 = askChoices("Choices 1", "Please choose one or more numbers.", Arrays.asList([ 1, 2, 3, 4, 5, 6 ]))
     print("Choices 1: ")
     for intChoice in choices1: 
         print(str(intChoice) + " ")
     print("")
 
     choices2 = askChoices("Choices 2", "Please choose one or more of the following.", 
-        [ 1.1, 2.2, 3.3, 4.4, 5.5, 6.6 ], ["Part 1", "Part 2", "Part 3", "Part 4", "Part 5", "Part 6" ])
+        Arrays.asList([ 1.1, 2.2, 3.3, 4.4, 5.5, 6.6 ]), ["Part 1", "Part 2", "Part 3", "Part 4", "Part 5", "Part 6" ])
     print("Choices 2: ")
     for intChoice in choices2:
         print(str(intChoice) + " ")	
