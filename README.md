@@ -24,7 +24,7 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
       e.g.
         ```bash
         # in the directory containing your checkout of this repo 
-        ln -s ~/ghidra_9.2.2_PUBLIC ghidra
+        ln -s ~/ghidra_9.*_PUBLIC ghidra
         . ~/graalvm/env.sh # build requires GraalVM
         gradle
         ls dist/
@@ -34,7 +34,7 @@ GraalVM is a drop in replacement for OpenJDK with some extra powers.
 3. Run ghidra with GraalVM and install the extension
     ```bash
     . ~/graalvm/env.sh
-    ~/ghidra_9.2.2_PUBLIC/ghidraRun
+    ~/ghidra_9.*_PUBLIC/ghidraRun
     ```
     From the main window, select `File->Install Extensions...`, click the `+`,
     and select the Ghidraal release zip file from the repo `dist` directory.
@@ -97,6 +97,16 @@ graalpython -m ginstall pypi pyelftools
 
 # Ghidraal changelog
 
+- ghidraal-0.0.5
+    - fix npm directory handling for javascript/nodejs
+    - python
+        - demo workaround for multi-context accesses in `askscript3.py`
+    - fix console locking on error
+    - updates to build.gradle 
+        - add eclipse plugin
+        - allow for "in tree" build
+    - add "reinstall" and "clean" commands to env.sh
+    - graalvm + ghidra version bump
 - ghidraal-0.0.4
     - don't run GhidraalScripts in swing thread
     - fix memory leak from unclosed polyglot contexts
