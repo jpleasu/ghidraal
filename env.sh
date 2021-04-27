@@ -19,7 +19,7 @@
 
 D="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && cd -P "$( dirname "$SOURCE" )" && pwd )"
  
-ver=21.0.0
+ver=21.1.0
 tarball="graalvm-ce-java11-linux-amd64-${ver}.tar.gz"
 linkname="jdk"
 jdk_dirname="graalvm-ce-java11-${ver}"
@@ -76,7 +76,7 @@ if [ ! -d "$D/graalvm-ce-java11-${ver}" ]; then
   wget "https://github.com/graalvm/graalvm-ce-builds/releases/download/vm-${ver}/${tarball}"
   tar -zxvf "${tarball}"
   ln -s "${jdk_dirname}" "${linkname}"
-  ./${linkname}/bin/gu install llvm-toolchain native-image python ruby R
+  ./${linkname}/bin/gu install llvm-toolchain native-image nodejs python ruby R wasm
   rm -f "${tarball}"
   popd > /dev/null
 fi
