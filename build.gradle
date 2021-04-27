@@ -13,6 +13,11 @@
 // Gradle should be invoked from the directory of the project to build.  Please see the
 // application.gradle.version property in <GHIDRA_INSTALL_DIR>/Ghidra/application.properties
 // for the correction version of Gradle to use for the Ghidra installation you specify.
+
+plugins {
+    id 'eclipse'
+}
+
 if(project.parent!=null) {
     apply from: "$rootProject.projectDir/gradle/distributableGhidraExtension.gradle"
     apply from: "$rootProject.projectDir/gradle/javaProject.gradle"
