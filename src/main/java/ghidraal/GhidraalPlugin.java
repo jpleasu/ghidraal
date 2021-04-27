@@ -40,7 +40,7 @@ public class GhidraalPlugin extends ProgramPlugin {
 	// @formatter:off
 	static List<LangInfo> langInfos = Arrays.asList(
 		new Python3LangInfo(),
-		new JavascriptLangInfo(),
+		new NodeJSLangInfo(),
 		new RscriptLangInfo(),
 		new RubyLangInfo()
 	);
